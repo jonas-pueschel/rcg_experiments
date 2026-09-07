@@ -39,6 +39,7 @@ mutable struct GreedySecantLinesearchStepsize{
     last_stepsize::F
     min_stepsize::F
     max_stepsize::F
+    sufficient_curvature::F
 end
 
 function GreedySecantLinesearchStepsize(
@@ -48,13 +49,14 @@ function GreedySecantLinesearchStepsize(
         initial_stepsize::Real = 1.0,
         min_stepsize::Real = 1.0e-10,
         max_stepsize::Real = 1.0e2,
+        sufficient_curvature::Real = 0.0
     )
     F = float(promote_type(typeof(initial_stepsize), typeof(min_stepsize), typeof(max_stepsize)))
     return GreedySecantLinesearchStepsize{
         typeof(retraction_method), typeof(vector_transport_method), F,
     }(
         retraction_method, vector_transport_method,
-        F(initial_stepsize), F(initial_stepsize), F(min_stepsize), F(max_stepsize),
+        F(initial_stepsize), F(initial_stepsize), F(min_stepsize), F(max_stepsize), F(sufficient_curvature)
     )
 end
 GreedySecantLinesearchStepsize(M::AbstractManifold, ::Any; kwargs...) =
@@ -74,6 +76,9 @@ function (ls::GreedySecantLinesearchStepsize)(
     q  = retract(M, p, b .* η, ls.retraction_method)
     ηq = vector_transport_to(M, p, η, q, ls.vector_transport_method)
     dϕb = get_differential(mp, q, ηq)                    # one A·X, the only probe
+
+    # greedier strategy
+    abs(dϕb) ≤ ls.sufficient_curvature * abs(dϕ0) && return b
 
     # secant root of ϕ' through (0, dϕ0) and (b, dϕb)
     t = dϕb > dϕ0 ? -dϕ0 * b / (dϕb - dϕ0) : NaN

@@ -558,14 +558,15 @@ function experiment_cg_stepsize(; n = 100, p = 5, seed = 42, perturb = 1e-1,
     # greedy secant: no bracketing/backtracking, no curvature-accept shortcut —
     # always one secant step, warm-started at 2/(L+μ) (same value as
     # `constant`) and thereafter using its own previous accepted step
-    secant() = GreedySecantLinesearch(; retraction_method = rm, vector_transport_method = vtm,
-                                        initial_stepsize = αc)
+    secant(;sufficient_curvature = 0.0) = GreedySecantLinesearch(; retraction_method = rm, vector_transport_method = vtm,
+                                        initial_stepsize = αc, sufficient_curvature)
     steps = [
         ("constant",     guard(ConstantLength(αc; type = :relative); pin_init = false)),
-        ("armijo",       guard(armijo())),
+        ("armijo",       guard(armijo(); pin_init = false)),
         ("hagerzhang",   rcg_hagerzhang_stepsize(M, rm, vtm; min_stepsize, init_stepsize)),
         ("wolfe-powell", guard(wolfepowell())),
         ("secant",       guard(secant(); pin_init = false)),
+        ("secant2",      guard(secant(;sufficient_curvature = 0.2); pin_init = false)),
     ]
 
     series = NamedTuple[]
@@ -816,6 +817,7 @@ function experiment_retractions(; n = 100, p = 5, seed = 42, perturb = 1e-1,
                     retraction_method = rm, dist = problem_distance)
             elseif m === :rcg
                 rcgstep = rcg_secant_stepsize(M, rm, vtm; min_stepsize, initial_stepsize = αc)
+                #rcgstep = rcg_hagerzhang_stepsize(M, rm, vtm; min_stepsize, init_stepsize = αc)
                 st = conjugate_gradient_descent(M, obj, X0;
                     coefficient = frprp, stepsize = rcgstep,
                     retraction_method = rm, vector_transport_method = vtm,
